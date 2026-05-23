@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>실험 결과 대시보드</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f7f6f3;--surface:#fff;--surface2:#f0ede8;
+  --accent:#7c6aff;--accent2:#ff6a8a;--accent3:#22c493;
+  --text:#1a1a1a;--text2:#888;--border:rgba(0,0,0,0.08);--r:12px;
+}
+body{background:var(--bg);color:var(--text);font-family:'Apple SD Gothic Neo','Pretendard',sans-serif;
+  min-height:100vh;padding:24px 16px 48px;max-width:800px;margin:0 auto}
+
+.top-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:8px}
+h1{font-size:22px;font-weight:800}
+.live-badge{display:inline-flex;align-items:center;gap:6px;background:#fff0f5;
+  color:var(--accent2);border:1px solid rgba(255,106,138,.2);border-radius:50px;
+  padding:4px 12px;font-size:11px;font-weight:700}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--accent2);
+  animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.7)}}
+.subtitle{font-size:13px;color:var(--text2);margin-bottom:20px}
+
+.btn-row{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+.btn{padding:9px 16px;border-radius:50px;border:none;font-size:13px;font-weight:600;
+  cursor:pointer;transition:opacity .15s;display:inline-flex;align-items:center;gap:6px}
+.btn:active{opacity:.8}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-outline{background:var(--surface);color:var(--text);border:1px solid var(--border)}
+.btn-danger{background:#fff0f0;color:#e53e3e;border:1px solid rgba(229,62,62,.2)}
+
+/* 요약 카드 */
+.summary-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px}
+@media(min-width:480px){.summary-grid{grid-template-columns:repeat(4,1fr)}}
+.stat-card{background:var(--surface);border-radius:var(--r);padding:16px 12px;
+  border:1px solid var(--border);text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.05)}
+.stat-card .num{font-size:26px;font-weight:800}
+.stat-card .lbl{font-size:11px;color:var(--text2);margin-top:4px;line-height:1.4}
+
+/* 바 차트 */
+.section{background:var(--surface);border-radius:var(--r);padding:20px;
+  border:1px solid var(--border);margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,.05)}
+.section h2{font-size:14px;font-weight:700;margin-bottom:16px;color:var(--text)}
+.bar-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.bar-label{width:76px;font-size:12px;color:var(--text2);flex-shrink:0;line-height:1.3}
+.bar-wrap{flex:1;height:30px;background:var(--surface2);border-radius:6px;overflow:hidden}
+.bar-fill{height:100%;border-radius:6px;display:flex;align-items:center;padding-left:10px;
+  font-size:11px;font-weight:700;color:#fff;min-width:0;
+  transition:width .7s cubic-bezier(.4,0,.2,1)}
+.bar-a{background:linear-gradient(90deg,#7c6aff,#a08dff)}
+.bar-b{background:linear-gradient(90deg,#ff6a8a,#ffadc0)}
+.bar-c{background:linear-gradient(90deg,#22c493,#6ee7c4)}
+.bar-val{font-size:12px;font-weight:700;min-width:44px;text-align:right}
+
+/* 테이블 */
+.table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:480px}
+thead tr{background:var(--surface2)}
+th{padding:10px 10px;text-align:left;font-size:10px;font-weight:700;
+  color:var(--text2);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+td{padding:10px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(124,106,255,.03)}
+.pid{font-weight:700;font-size:12px;color:var(--accent);font-family:monospace}
+.badge{display:inline-block;padding:2px 7px;border-radius:50px;font-size:10px;font-weight:700}
+.badge-a{background:rgba(124,106,255,.12);color:#7c6aff}
+.badge-b{background:rgba(255,106,138,.12);color:#ff6a8a}
+.badge-c{background:rgba(34,196,147,.12);color:#22c493}
+.t-fast{color:#22c493;font-weight:700}
+.t-slow{color:#ff6a8a;font-weight:700}
+.t-normal{color:var(--text);font-weight:600}
+.ts{font-size:11px;color:var(--text2)}
+
+/* 빈/로딩 */
+.empty{text-align:center;padding:48px 20px;color:var(--text2)}
+.empty .icon{font-size:44px;margin-bottom:12px}
+.empty p{font-size:14px;line-height:1.7}
+.loading-wrap{text-align:center;padding:40px;color:var(--text2)}
+.spinner{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--accent);
+  border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <h1>📊 실험 결과 대시보드</h1>
+  <div class="live-badge"><div class="live-dot"></div>실시간 수집 중</div>
+</div>
+<p class="subtitle" id="subtitle">Firebase에서 데이터를 불러오는 중...</p>
+
+<div class="btn-row">
+  <button class="btn btn-primary" onclick="loadData()">🔄 새로고침</button>
+  <button class="btn btn-outline" onclick="exportCSV()">⬇️ CSV 내보내기</button>
+  <button class="btn btn-danger" onclick="clearData()">🗑️ 전체 삭제</button>
+</div>
+
+<!-- 요약 -->
+<div class="summary-grid">
+  <div class="stat-card">
+    <div class="num" id="stat-total" style="color:var(--accent)">—</div>
+    <div class="lbl">총 참여자</div>
+  </div>
+  <div class="stat-card">
+    <div class="num" id="stat-avg-a" style="color:#7c6aff">—</div>
+    <div class="lbl">A 평균<br>(넷플릭스)</div>
+  </div>
+  <div class="stat-card">
+    <div class="num" id="stat-avg-b" style="color:#ff6a8a">—</div>
+    <div class="lbl">B 평균<br>(4×4 그리드)</div>
+  </div>
+  <div class="stat-card">
+    <div class="num" id="stat-avg-c" style="color:#22c493">—</div>
+    <div class="lbl">C 평균<br>(릴스)</div>
+  </div>
+</div>
+
+<!-- 바 차트 -->
+<div class="section">
+  <h2>⏱ 인터페이스별 평균 선택 시간 (낮을수록 빠름)</h2>
+  <div class="bar-row">
+    <div class="bar-label">A<br>넷플릭스</div>
+    <div class="bar-wrap"><div class="bar-fill bar-a" id="bar-a" style="width:0%"></div></div>
+    <div class="bar-val" id="bval-a">—</div>
+  </div>
+  <div class="bar-row">
+    <div class="bar-label">B<br>4×4 그리드</div>
+    <div class="bar-wrap"><div class="bar-fill bar-b" id="bar-b" style="width:0%"></div></div>
+    <div class="bar-val" id="bval-b">—</div>
+  </div>
+  <div class="bar-row">
+    <div class="bar-label">C<br>릴스</div>
+    <div class="bar-wrap"><div class="bar-fill bar-c" id="bar-c" style="width:0%"></div></div>
+    <div class="bar-val" id="bval-c">—</div>
+  </div>
+  <div style="margin-top:12px;font-size:12px;color:var(--text2);text-align:center" id="winner-txt"></div>
+</div>
+
+<!-- 개인별 테이블 -->
+<div class="section">
+  <h2>👤 참여자별 상세 데이터</h2>
+  <div class="table-wrap" id="table-wrap">
+    <div class="loading-wrap"><div class="spinner"></div><p>불러오는 중...</p></div>
+  </div>
+</div>
+
+<script>
+const FB_URL = 'https://he-ott-time-experiment-a89af-default-rtdb.firebaseio.com';
+let allData = [];
+let fbKeys = {}; // Firebase key → data 매핑 (삭제용)
+
+async function loadData() {
+  document.getElementById('subtitle').textContent = '데이터 불러오는 중...';
+  document.getElementById('table-wrap').innerHTML =
+    '<div class="loading-wrap"><div class="spinner"></div><p>Firebase에서 불러오는 중...</p></div>';
+
+  try {
+    const res = await fetch(`${FB_URL}/results.json`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const raw = await res.json();
+
+    fbKeys = raw || {};
+    // Firebase는 {key: {participant_id, timestamp, results}} 구조
+    allData = raw ? Object.values(raw) : [];
+
+    // timestamp 기준 최신순 정렬
+    allData.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    const now = new Date().toLocaleString('ko-KR', {
+      month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit'
+    });
+    document.getElementById('subtitle').textContent =
+      `Firebase 실시간 데이터 · 마지막 업데이트 ${now} · 총 ${allData.length}명`;
+
+    renderSummary();
+    renderTable();
+  } catch(e) {
+    document.getElementById('subtitle').textContent = `⚠️ 불러오기 실패: ${e.message}`;
+    document.getElementById('table-wrap').innerHTML =
+      `<div class="empty"><div class="icon">⚠️</div><p>Firebase 연결 오류<br>${e.message}</p></div>`;
+  }
+}
+
+function avg(arr) {
+  if (!arr.length) return null;
+  return arr.reduce((a, b) => a + b, 0) / arr.length;
+}
+function fmtSec(ms) {
+  if (ms == null) return '—';
+  return (ms / 1000).toFixed(1) + 's';
+}
+
+function renderSummary() {
+  document.getElementById('stat-total').textContent = allData.length;
+
+  const times = { A: [], B: [], C: [] };
+  allData.forEach(p => {
+    (p.results || []).forEach(r => {
+      if (times[r.interface_id]) times[r.interface_id].push(r.time_ms);
+    });
+  });
+
+  const avgs = { A: avg(times.A), B: avg(times.B), C: avg(times.C) };
+  document.getElementById('stat-avg-a').textContent = fmtSec(avgs.A);
+  document.getElementById('stat-avg-b').textContent = fmtSec(avgs.B);
+  document.getElementById('stat-avg-c').textContent = fmtSec(avgs.C);
+
+  // 바 차트
+  const maxVal = Math.max(...Object.values(avgs).filter(v => v != null), 1);
+  ['A','B','C'].forEach(id => {
+    const v = avgs[id];
+    const pct = v != null ? Math.max((v / maxVal) * 88, 6) : 0;
+    const bar = document.getElementById(`bar-${id.toLowerCase()}`);
+    const bval = document.getElementById(`bval-${id.toLowerCase()}`);
+    setTimeout(() => { bar.style.width = pct + '%'; }, 100);
+    bar.textContent = v != null ? fmtSec(v) : '';
+    bval.textContent = fmtSec(v);
+  });
+
+  // 가장 빠른 인터페이스
+  const entries = Object.entries(avgs).filter(([, v]) => v != null);
+  if (entries.length >= 2) {
+    const [winner] = entries.reduce((a, b) => a[1] < b[1] ? a : b);
+    const labels = { A: '넷플릭스형(A)', B: '4×4 그리드(B)', C: '릴스형(C)' };
+    document.getElementById('winner-txt').textContent =
+      `🏆 가장 빠른 인터페이스: ${labels[winner]}`;
+  }
+}
+
+function renderTable() {
+  const wrap = document.getElementById('table-wrap');
+  if (!allData.length) {
+    wrap.innerHTML = `<div class="empty"><div class="icon">📭</div>
+      <p>아직 실험 참여자가 없어요.<br>실험 링크를 공유해서 참여를 받아보세요!</p></div>`;
+    return;
+  }
+
+  const allTimes = allData.flatMap(p =>
+    (p.results || []).map(r => r.time_ms).filter(Boolean));
+  const minT = Math.min(...allTimes);
+  const maxT = Math.max(...allTimes);
+
+  function timeCls(ms) {
+    if (!ms) return 't-normal';
+    if (ms === minT) return 't-fast';
+    if (ms === maxT) return 't-slow';
+    return 't-normal';
+  }
+
+  function cell(r) {
+    if (!r) return '<td style="color:var(--text2);font-size:12px">—</td>';
+    return `<td>
+      <span class="badge badge-${r.interface_id.toLowerCase()}">${r.selected}</span>
+      <span class="${timeCls(r.time_ms)}" style="font-size:12px;margin-left:4px">${fmtSec(r.time_ms)}</span>
+    </td>`;
+  }
+
+  let html = `<table>
+    <thead><tr>
+      <th>#</th><th>참여자</th>
+      <th>A 넷플릭스</th><th>B 4×4</th><th>C 릴스</th>
+      <th>참여일시</th>
+    </tr></thead><tbody>`;
+
+  allData.forEach((p, i) => {
+    const res = {};
+    (p.results || []).forEach(r => { res[r.interface_id] = r; });
+    const ts = p.timestamp
+      ? new Date(p.timestamp).toLocaleString('ko-KR', {
+          month:'2-digit', day:'2-digit',
+          hour:'2-digit', minute:'2-digit'
+        })
+      : '—';
+    html += `<tr>
+      <td style="color:var(--text2);font-size:12px">${allData.length - i}</td>
+      <td class="pid">${p.participant_id || '—'}</td>
+      ${cell(res.A)}${cell(res.B)}${cell(res.C)}
+      <td class="ts">${ts}</td>
+    </tr>`;
+  });
+
+  html += '</tbody></table>';
+  html += `<div style="text-align:right;margin-top:10px;font-size:11px;color:var(--text2)">
+    🟢 빠름 &nbsp; 🔴 느림 &nbsp; (전체 참여자 중 상대적 비교)
+  </div>`;
+  wrap.innerHTML = html;
+}
+
+function exportCSV() {
+  if (!allData.length) { alert('데이터가 없어요!'); return; }
+  const lines = ['참여자ID,인터페이스,선택캐릭터,선택시간(ms),선택시간(초),참여일시'];
+  allData.forEach(p => {
+    (p.results || []).forEach(r => {
+      lines.push([
+        p.participant_id, r.interface_id, r.selected,
+        r.time_ms, (r.time_ms / 1000).toFixed(2), p.timestamp
+      ].join(','));
+    });
+  });
+  const blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `ott_experiment_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+async function clearData() {
+  if (!confirm(`Firebase의 모든 데이터(${allData.length}명)를 삭제할까요?\n이 작업은 되돌릴 수 없어요.`)) return;
+  try {
+    await fetch(`${FB_URL}/results.json`, { method: 'DELETE' });
+    alert('삭제 완료!');
+    loadData();
+  } catch(e) {
+    alert('삭제 실패: ' + e.message);
+  }
+}
+
+// 시작 + 30초마다 자동 새로고침
+loadData();
+setInterval(loadData, 30000);
+</script>
+</body>
+</html>
